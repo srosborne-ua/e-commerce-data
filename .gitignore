@@ -1,0 +1,15 @@
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.env.*
+*.env
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.parquet
