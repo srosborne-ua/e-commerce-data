@@ -20,6 +20,9 @@ frames = {
     "category_translation": pd.read_csv(DATA_DIR / "product_category_name_translation.csv"),
 }
 
-for name, df in frames.items():
-    print(f"\n{name}: {df.shape[0]:,} rows, {df.shape[1]} cols — nulls: {df.isnull().sum().sum()}")
-    print(f"  columns: {list(df.columns)}")
+# for name, df in frames.items():
+#     print(f"\n{name}: {df.shape[0]:,} rows, {df.shape[1]} cols — nulls: {df.isnull().sum().sum()}")
+#     print(f"  columns: {list(df.columns)}")
+
+print(frames["customers"].head)
+print(frames["geolocation"].info())
