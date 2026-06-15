@@ -42,9 +42,15 @@ engine = create_engine("postgresql+psycopg2://localhost/olist")
 
 # all_delivered_orders_query = """select * from orders where order_status = 'delivered'"""
 
+# filtered_orders = """select order_id, order_status, order_purchase_timestamp
+# from orders where order_purchase_timestamp > '2018-01-01' and order_status = 'delivered'
+# order by order_purchase_timestamp asc"""
 
+order_type_count = """select order_status, count(order_status) from orders
+group by order_status 
+order by count(order_status) desc"""
 
-df = pd.read_sql(all_delivered_orders_query, engine)
+df = pd.read_sql(order_type_count, engine)
 print(df)
 
 # print(pd.read_sql(query1, engine))
