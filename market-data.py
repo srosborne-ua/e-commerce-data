@@ -24,5 +24,27 @@ frames = {
 #     print(f"\n{name}: {df.shape[0]:,} rows, {df.shape[1]} cols — nulls: {df.isnull().sum().sum()}")
 #     print(f"  columns: {list(df.columns)}")
 
-print(frames["customers"].head)
-print(frames["geolocation"].info())
+# for name, df in frames.items():
+#     print(f"\n{name}:")
+#     print(df.head(1))
+
+from sqlalchemy import create_engine
+
+engine = create_engine("postgresql+psycopg2://localhost/olist")
+
+# Load all frames into postgres — table name = dict key
+# for name, df in frames.items():
+#     df.to_sql(name, engine, if_exists="replace", index=False)
+#     print(f"Loaded {name}: {len(df)} rows")
+
+# order_status_query = """select distinct order_status
+#                         from orders"""
+
+# all_delivered_orders_query = """select * from orders where order_status = 'delivered'"""
+
+
+
+df = pd.read_sql(all_delivered_orders_query, engine)
+print(df)
+
+# print(pd.read_sql(query1, engine))
