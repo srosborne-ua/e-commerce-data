@@ -46,11 +46,24 @@ engine = create_engine("postgresql+psycopg2://localhost/olist")
 # from orders where order_purchase_timestamp > '2018-01-01' and order_status = 'delivered'
 # order by order_purchase_timestamp asc"""
 
-order_type_count = """select order_status, count(order_status) from orders
-group by order_status 
-order by count(order_status) desc"""
+# order_type_count = """select order_status, count(order_status) from orders
+# group by order_status 
+# order by count(order_status) desc"""
 
-df = pd.read_sql(order_type_count, engine)
+# customer_order_join = """select order_id, order_status, customers.customer_state, customers.customer_city from orders
+# join customers on customers.customer_id = orders.customer_id
+# limit 10"""
+
+total_rev = """select order_id, sum(price + freight_value) as order_revenue
+                from order_items
+                group by order_id
+                order by order_revenue desc
+                limit 10
+                """
+
+df = pd.read_sql(total_rev, engine)
 print(df)
+
+
 
 # print(pd.read_sql(query1, engine))
