@@ -61,9 +61,113 @@ total_rev = """select order_id, sum(price + freight_value) as order_revenue
                 limit 10
                 """
 
-df = pd.read_sql(total_rev, engine)
-print(df)
+on_time_query = """select
+                case
+                    when o.order_delivered_customer_date::timestamp <= o.order_estimated_delivery_date::timestamp
+                    then 'On Time'
+                    when o.order_delivered_customer_date::timestamp <= o.order_estimated_delivery_date::timestamp + Interval '3 days'
+                    then '1-3 days late'
+                    when o.order_delivered_customer_date::timestamp <= o.order_estimated_delivery_date::timestamp + Interval '7 days'
+                    then '4-7 days late'
+                    else '7+ days late'
+                    end as arrival_time_status, ROUND(AVG(r.review_score), 2) AS avg_review_score, COUNT(*) AS order_count
+                from orders o 
+                Join order_reviews r on r.order_id = o.order_id
+                where o.order_delivered_customer_date IS NOT NULL
+                AND o.order_estimated_delivery_date IS NOT NULL
+                GROUP BY arrival_time_status
+                ORDER BY avg_review_score DESC
+                """
 
+revenue_by_category = """
+                    SELECT
+                        ct.product_category_name_english AS category,
+                        ROUND(SUM(oi.price)::numeric, 2) AS total_revenue,
+                        ROUND(SUM(oi.freight_value)::numeric, 2) AS total_freight,
+                        ROUND((SUM(oi.freight_value) / SUM(oi.price) * 100)::numeric, 1) AS freight_pct,
+                        COUNT(DISTINCT oi.order_id) AS order_count
+                    FROM order_items oi
+                    JOIN products p ON p.product_id = oi.product_id
+                    JOIN category_translation ct ON ct.product_category_name = p.product_category_name
+                    GROUP BY category
+                    ORDER BY total_revenue DESC
+                    LIMIT 20;
+                    """
 
+customer_segmentation = customer_segmentation = """
+WITH rfm AS (
+    SELECT
+        c.customer_unique_id,
+        MAX(o.order_purchase_timestamp::timestamp) AS last_order,
+        COUNT(DISTINCT o.order_id)                 AS frequency,
+        ROUND(SUM(op.payment_value)::numeric, 2)   AS monetary
+    FROM orders o
+    JOIN customers c       ON c.customer_id = o.customer_id
+    JOIN order_payments op ON op.order_id = o.order_id
+    WHERE o.order_status = 'delivered'
+    GROUP BY c.customer_unique_id
+),
+scored AS (
+    SELECT *,
+        NTILE(4) OVER (ORDER BY last_order) AS r_score,
+        NTILE(4) OVER (ORDER BY frequency)  AS f_score,
+        NTILE(4) OVER (ORDER BY monetary)   AS m_score
+    FROM rfm
+),
+labeled AS (
+    SELECT *,
+        (r_score + f_score + m_score) AS rfm_total,
+        CASE
+            WHEN (r_score + f_score + m_score) >= 10 THEN 'Champions'
+            WHEN (r_score + f_score + m_score) >= 7  THEN 'Loyal'
+            WHEN (r_score + f_score + m_score) >= 5  THEN 'At Risk'
+            ELSE 'Lost'
+        END AS segment
+    FROM scored
+)
+SELECT segment,
+       COUNT(*)                             AS customer_count,
+       ROUND(AVG(monetary)::numeric, 2)     AS avg_spend,
+       ROUND(AVG(frequency)::numeric, 2)    AS avg_orders
+FROM labeled
+GROUP BY segment
+ORDER BY avg_spend DESC
+"""
 
-# print(pd.read_sql(query1, engine))
+month_revenue = """
+WITH monthly AS (
+    SELECT
+        DATE_TRUNC('month', o.order_purchase_timestamp::timestamp)::date AS month,
+        ROUND(SUM(op.payment_value)::numeric, 2) AS monthly_revenue
+    FROM orders o
+    JOIN order_payments op ON op.order_id = o.order_id
+    WHERE o.order_status = 'delivered'
+    GROUP BY month
+),
+lagged AS (
+    SELECT *,
+        LAG(monthly_revenue) OVER (ORDER BY month) AS prev_revenue
+    FROM monthly
+)
+SELECT
+    month,
+    monthly_revenue,
+    prev_revenue,
+    ROUND(((monthly_revenue - prev_revenue) / prev_revenue * 100)::numeric, 1) AS mom_pct_change
+FROM lagged
+ORDER BY month
+"""
+OUTPUT_DIR = Path("/Users/sageosborne/Documents/e-commerce-data/output")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+queries = {
+    "delivery_review":    on_time_query,
+    "category_revenue":   revenue_by_category,
+    "rfm_segments":       customer_segmentation,
+    "mom_revenue":        month_revenue,
+}
+
+for name, query in queries.items():
+    df = pd.read_sql(query, engine)
+    df.to_csv(OUTPUT_DIR / f"{name}.csv", index=False)
+    print(f"exported {name}: {len(df)} rows")
